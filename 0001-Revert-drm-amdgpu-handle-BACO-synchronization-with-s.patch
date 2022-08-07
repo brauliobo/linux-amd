@@ -1,0 +1,71 @@
+From 51889caf51ecea47b2a39dd3352b88711a491e18 Mon Sep 17 00:00:00 2001
+From: Braulio Bhavamitra <brauliobo@gmail.com>
+Date: Sun, 7 Aug 2022 19:18:08 -0300
+Subject: [PATCH] Revert "drm/amdgpu: handle BACO synchronization with
+ secondary funcs"
+
+This reverts commit 243c719e872a1322b22efccff80776353357b296.
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c | 30 ++++++++++---------------
+ 1 file changed, 12 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
+index 8890300766a5..bc9d140470ec 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
+@@ -1961,25 +1961,19 @@ MODULE_DEVICE_TABLE(pci, pciidlist);
+ 
+ static const struct drm_driver amdgpu_kms_driver;
+ 
+-static void amdgpu_get_secondary_funcs(struct amdgpu_device *adev)
++static void amdgpu_get_audio_func(struct amdgpu_device *adev)
+ {
+ 	struct pci_dev *p = NULL;
+-	int i;
+ 
+-	/* 0 - GPU
+-	 * 1 - audio
+-	 * 2 - USB
+-	 * 3 - UCSI
+-	 */
+-	for (i = 1; i < 4; i++) {
+-		p = pci_get_domain_bus_and_slot(pci_domain_nr(adev->pdev->bus),
+-						adev->pdev->bus->number, i);
+-		if (p) {
+-			pm_runtime_get_sync(&p->dev);
+-			pm_runtime_mark_last_busy(&p->dev);
+-			pm_runtime_put_autosuspend(&p->dev);
+-			pci_dev_put(p);
+-		}
++	p = pci_get_domain_bus_and_slot(pci_domain_nr(adev->pdev->bus),
++			adev->pdev->bus->number, 1);
++	if (p) {
++		pm_runtime_get_sync(&p->dev);
++
++		pm_runtime_mark_last_busy(&p->dev);
++		pm_runtime_put_autosuspend(&p->dev);
++
++		pci_dev_put(p);
+ 	}
+ }
+ 
+@@ -2143,14 +2137,14 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
+ 		 * be no PMFW-aware D-state transition(D0->D3) on runpm
+ 		 * suspend. Thus the BACO will be not correctly kicked in.
+ 		 *
+-		 * Via amdgpu_get_secondary_funcs(), the audio dev is put
++		 * Via amdgpu_get_audio_func(), the audio dev is put
+ 		 * into D0 state. Then there will be a PMFW-aware D-state
+ 		 * transition(D0->D3) on runpm suspend.
+ 		 */
+ 		if (amdgpu_device_supports_baco(ddev) &&
+ 		    !(adev->flags & AMD_IS_APU) &&
+ 		    (adev->asic_type >= CHIP_NAVI10))
+-			amdgpu_get_secondary_funcs(adev);
++			amdgpu_get_audio_func(adev);
+ 	}
+ 
+ 	return 0;
+-- 
+2.37.1
+
